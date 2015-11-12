@@ -1,7 +1,9 @@
 import controlP5.*;
 
 /* Steering Behaviors
-   slsdo - slsdo.github.io */
+   https://slsdo.github.io/steeringbehaviors/
+   
+   Compatible with Processing 2.2.1 and ControlP5 2.0.4 */
    
 // Global variables
 World world;

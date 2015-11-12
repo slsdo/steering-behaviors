@@ -1,7 +1,9 @@
 import controlP5.*;
 
 /* Steering Behaviors
-   Future Data Lab - futuredatalab.com */
+   http://www.futuredatalab.com/steeringbehaviors/
+   
+   Compatible with Processing 2.2.1 and ControlP5 2.0.4 */
    
 // Global variables
 World world;

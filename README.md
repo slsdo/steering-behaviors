@@ -21,14 +21,11 @@ References
 - http://www.vergenet.net/~conrad/boids/pseudocode.html
 - http://www.shiffman.net/teaching/nature/steering/
 
-To-do
------
-
-- Code optimization
-- Different types of objects
- 
 History
 -------
+
+Version 1.2 - 2015/11/17
+- Updated code to work with Processing 3 and ControlP5 2.2.5
 
 Version 1.1 - 2010/8/10
 - Added Settings GUI

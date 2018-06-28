@@ -1,0 +1,215 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+    <title>Steering Behaviors | slsdo</title>
+
+    <meta http-equiv="Content-Type" content="text/html;charset=utf-8" />
+    <meta name="description" content="Steering Behaviors" />
+    <meta name="keywords" content="Steering Behaviors" />
+
+    <link rel="shortcut icon" href="favicon.ico" type="image/x-icon" />
+
+    <link rel="stylesheet" type="text/css" href="style.css" />
+    <style type="text/css">
+        #content table { width: 700px; margin: 0 auto; border:1px solid #ccc; }
+        #content table td { vertical-align:top; }
+        #content table td pre { margin:20px 0 0; color:#363; }
+        #download { margin-left: 100px; }
+    </style>
+</head>
+
+<body>
+    <div class="wrapper">
+        <ul id="nav">
+            <li><a href="http://slsdo.github.io/steering-behaviors/" style="border-left:0;">Home</a></li>
+            <li><a href="#intro">Intro</a></li>
+            <li><a href="#background">Background</a></li>
+            <li><a href="#details">Details</a></li>
+            <li><a href="#result">Results</a></li>
+            <li><a href="https://github.com/slsdo/steering-behaviors">Code</a></li>
+        </ul>
+
+        <div id="content">
+            <h1>Steering Behaviors</h1>
+
+            <p id="intro"><em>Steering Behaviors Simulation</em></p>
+
+            <p>This project showcases a variety of steering behaviors such as flocking, wandering, and object avoidance. The concept is based on <a href="http://www.red3d.com/cwr/steer/">Craig Reynolds</a>'s <a href="http://www.red3d.com/cwr/boids/">Boids</a> and emergent behaviors, which explores how complex behavior can arise out of a combination of relatively simple behaviors. A great example is flocking, which emerges from a simulation of separation, alignment, and cohesion.</p>
+
+            <p>The project was created using <a href="http://processing.org/">Processing</a>, references used include works by <a href="http://www.vergenet.net/~conrad/boids/">Conrad Parker</a> and <a href="http://natureofcode.com/book/chapter-6-autonomous-agents/">Daniel Shiffman</a>. Some interesting examples of flocking simulations can be found <a href="http://blog.soulwire.co.uk/laboratory/flash/as3-flocking-steering-behaviors">here</a>.</p>
+
+            <div class="center"><a href="#result"><img src="img/steering_result.png" title="Run, little boids, run!" alt="steering_result" /></a></div>
+
+            <h2 id="background">Behavioral Simulation</h2>
+
+            <p>The central idea behind behavioral simulation is that each agent in the swarm is treated as a single particle that carries multiple properties, such as position, velocity, orientation (and others depending on the programmer's needs). When rendering, the program iterates through each agent to compute its new steering velocity based on the agent's surroundings, then updates the agent's position for the next iteration. When updating an agent's movements, it's important to check the agent's new velocity against a maximum velocity limit. If the velocity is too big, we set it to the maximum velocity so our agent won't move too fast.</p>
+
+            <p>Computing the new steering velocity involves combining the velocity/orientation contributions from all applicable steering forces, such as object avoidance and flocking, the sum of those velocities and orientation angles are also kept to a user-specified upper limit.</p>
+
+            <p>The simplest way to combine the steering forces is through addition, but that won't work in all situations. For example, the "wander" steering force is pointing towards a wall, directly in conflict with the "avoid" steering force that is pointing away from the wall, in this case we obviously want to turn away from (or along) the wall. Many methods exist to solve this problem, from state machines to weighted sums (multiply each steering component by a user-specified weight) to fixed priority coordination (some behaviors always have priority over others based on the agent's surroundings). This program relies on a combination of weighted sum and priority coordination.</p>
+
+            <p>Since the goal of this project was to create a simple simulator, each agent only comes with three main attributes: position, velocity, and acceleration, all other necessary information can be (for the most part) derived from those.</p>
+
+            <h2 id="details">Individual Behaviors</h2>
+
+            <p>Below are some general concepts of how each individual steering behavior was implemented.</p>
+
+            <h3>Seek/Flee</h3>
+
+            <p>This is the most straightforward behavior to implement. After determining a target, simply find the vector pointing from the current agent position to the target, that vector is the steering force.</p>
+
+            <p>Fleeing works exactly like seek, except the vector is pointing from the target to the agent, so just take the seek vector and multiply it by -1.</p>
+
+            <table>
+                <tr>
+                    <td><img src="img/steering_seekflee.jpg" title="Seed/flee." alt="steering_seekflee" /></td>
+                    <td><pre>
+// Seek
+
+e = target - position;
+distance = e.magnitude();
+if (distance > 0) {
+    e.normalize();
+    e = e*maxspeed;
+    steer = e - velocity;
+}
+                    </pre></td>
+                </tr>
+            </table>
+
+            <h3>Arrival/Departure</h3>
+
+            <p>Arrival and departure function much like seek and flee, except as the agent approaches the target, it slows down (for departure, the closer it is to the target, the faster it moves away).</p>
+
+            <p>To accomplish this, a majority of the code for seek and flee can be reused. We create a spherical zone around the target (the radius is determined by the user), as the agent moves within the circle's radius, its speed is weighed down by its distance to the target with respect to the circle's radius.</p>
+
+            <p>For departure (and flee as well), it's a good idea to set a radius around the target (of which the agent is fleeing from) such that the agent stops fleeing after having passed it, unless you want the agent to keep running until it's at the edge (or outside) of the simulation screen.</p>
+
+            <table>
+                <tr>
+                    <td><img src="img/steering_arrivedepart.jpg" title="Arrival/departure." alt="steering_arrivedepart" /></td>
+                    <td><pre>
+// Arrival
+
+e = target - position;
+distance = e.magnitude();
+if (distance > 0) {
+    e.normalize();
+    if (distance &lt; ARadius)
+        // Damping
+        e *= maxspeed*(distance/ARadius);
+    else
+        e *= maxspeed;
+    steer = e - velocity;
+}
+                    </pre></td>
+                </tr>
+            </table>
+
+            <h3>Pursue/Evade</h3>
+
+            <p>Very simple to implement once you have seek/flee working. For the predator, use its prey's position as the target. To make the predator look smarter, you can even use the prey's current velocity and heading vector to predict where it will go (to offset the pursuit path). As for evasion, it's almost identical as pursue: the agent runs away when a predator is within a certain radius. For some <a href="http://www.vergenet.net/~conrad/boids/">interesting discussion</a> on selfish behaviors within a flock:</p>
+
+            <blockquote>
+            <p>A simple strategy for a predator animal is to chase the closest prey animal in its vicinity. This is reasonable because it expends the least amount of effort for the predator.</p>
+
+            <p>Then a strategy for a prey individual is to try to keep as far away from predators as possible: if predators only attack the closest prey individuals, then all the others should be safe. You can consider each prey individual as having a "domain of danger" surrounding it. This is the area around it comprising the points around it to which it is the closest prey. For example, a lone individual would have a "domain of danger" which is a large circle around it, whereas each individual in a pack would have a small "domain of danger" around it. Then the strategy is to reduce the "domain of danger" as much as possible. This is achieved in the pack formation, where all the prey individuals try to stay together, each one of them selfishly trying to reduce its own "domain of danger". However, the individuals on the edges of the pack have a much greater "domain of danger" than those in the interior. Thus, the individuals on the edge of the pack try to move towards the interior of the pack, which moves other individuals to the edges.</p>
+
+            <p>This strategy correlates well with the <strong>boids</strong> rules. Each individual boid tries to move towards the centre of mass of the pack, which very simply implements the reduction of the "domain of danger". Of course, they cannot all move to the very centre: there is a limit to the closeness of individuals, such that they all have enough room to move. This is also implemented as a rule for <em>Boids</em>.</p>
+            </blockquote>
+
+            <h3>Wander</h3>
+
+            <p>Wandering simply means the agent is moving around randomly. Although it sounds simple at first, a little effort is required to produce a more realistic wandering behavior. Imagine the agent is in the center of a circle, in the simplest case, the seek algorithm can be used to steer the agent towards random points on the circumference. However, the movement from this method is too "twitchy." We want natural-looking turns and sustained orientation.</p>
+
+            <p>An improved method that gets rid of large erratic movements is to attach a smaller circle around the seek target from before (the one on the big circle), pick a random point on the smaller circle's circumference, then use the difference between that point and the point on the big circle as the final displacement. One could also simply pick a random point between a small positive and negative number as the displacement to achieve similar results.</p>
+
+            <p>In the 3D case, simply replace the circles with spheres.</p>
+
+            <table>
+                <tr>
+                    <td><img src="img/steering_wander.jpg" title="Wander." alt="steering_wander" /></td>
+                    <td><pre>
+// Wander
+
+// Find center of circle
+direction = velocity.normalized();
+center = position + direction*length;
+// Random walk
+wdelta += random(-Rrad, Rrad) // Lazy...
+x = Vrad*cos(wdelta);
+y = Vrad*sin(wdelta);
+offset = vec3(x, y);
+target = center + offset;
+steer = seek(target);
+                    </pre></td>
+                </tr>
+            </table>
+
+            <h3>Object Avoidance</h3>
+
+            <p>A bit harder than the others, object avoidance can be thought of as a simplified pathfinding algorithm (which in itself is a major topic).</p>
+
+            <p>Craig Reynolds suggested two methods. The first one places a rectangle (or a circle of a certain radius) some distance in front of the agent, then check whether that rectangle is intersecting with any obstacles. For this method, all objects in the scene should be places in a spherical (or rectangular) bounding volume for easier intersection tests.</p>
+
+            <p>Another way to implementing object avoidance is to first convert the object's coordinate into the agent's local coordinate (for simpler calculations), then draw a vector from the agent's position to the center of the object's bounding sphere. If the x component of that vector is greater than the rectangle's width (rectangle's x component), we know the two shapes are not intersecting, otherwise there is a potential intersection, in which case we compare the y component of each. Refer to the image for a better idea of how this is done. If there is an intersection, we calculate a vector pointing away from the object's bounding sphere using the agent's current velocity and orientation.</p>
+
+            <p>The second method suggested by Reynolds (which he calls "containment") tests for points a certain length directly in front of and to the left/right of the agent, if a point intersects with an object or a wall, a vector normal to the object/wall is calculated based on the location of the probe point and the intersection, and is used as the target for steering. <a href="http://fbim.fh-regensburg.de/~saj39122/feisch/Diplomarbeit/theory_eng/steering_eng.html">Check here</a> for improvements to this method using exclusion tests and fuzzy logic. Another good read on the subject is Craig Reynolds's paper <a href="http://www.red3d.com/cwr/nobump/nobump.html">Not Bumping Into Things</a>.</p>
+
+            <p>Both methods have their shortcomings. The first one requires objects to be inside bounding volumes. The second one, while applicable to object of any shape, fails when the agent is facing a concave corner (for example, the corner of a room). To handle these cases one can either hard code logic for specific cases, or use a more complicated path-finding algorithm.</p>
+
+            <p>For this project, a very simplified avoidance algorithm based on the first method was used. Each agent has its own "avoidance sphere" with a specific radius. If an obstacle comes within the sphere, we check the direction of the agent's current velocity. If it's heading away from the object, do nothing. If it's heading toward the object, calculate a steering force that will lead the agent around or away from the object based on its current velocity, position, and heading.</p>
+
+            <table>
+                <tr>
+                    <td><img src="img/steering_avoid.jpg" title="Object avoidance." alt="steering_avoid" /></td>
+                    <td><pre>
+// Object Avoidance
+
+if ||dx|| &lt;= Lb {
+    if ||dy|| &lt;= rb + ro {
+        n = -1*d.normalize(); // Direction
+        e = ((rb + ro) - ||dy||)/(rb + ro)
+        e *= maxspeed;
+        steer = e*n;
+    }
+}
+                    </pre></td>
+                </tr>
+            </table>
+
+            <h3>Flocking</h3>
+
+            <p>Flocking is probably the most popular steering behavior (and one that's been simulated to death). Unlike the previous behavioral algorithms, flocking and its constituents (namely alignment, cohesion, and separation) are group behaviors, meaning they depend on neighboring agents.</p>
+
+            <p>To accomplish this, we first check the position/velocity of the current agent's neighbors, then calculate the alignment, cohesion, and separation forces. Adding those forces (place more importance on certain variables by multiplying it with a larger weight constant) together will naturally result in flocking.</p>
+
+            <div class="center"><img src="img/steering_flock.jpg" title="From left to right: separation, alignment, cohesion." alt="steering_flock" /></div>
+
+            <p><strong>Separation</strong>: When an agent tries to avoid bumping into local flockmates. To do this, we go through other agents within a certain radius of our agent and accumulate the inverse (opposite) of a fraction of each agent's velocity, then add it to the current agent's velocity, so it will try to move away from where the rest of its flockmates are heading toward, but not so far as to stray from the flock.</p>
+
+            <p><strong>Alignment</strong>: When an agent tries to match the velocity of its neighbor flockmates. This can be accomplished by finding the average velocity of the current agent's flockmates within a certain radius, and set that as the current agent's velocity.</p>
+
+            <p><strong>Cohesion</strong>: When an agent tries to steer toward where the rest of its flockmates are heading. We accomplish this by finding the average position of the agent's current flockmates within a certain radius, and set that location as the agent's target.</p>
+
+            <p>A great explanation of these behaviors and their psuedocode can be found on <a href="http://www.vergenet.net/~conrad/boids/pseudocode.html">Conrad Parker's website</a>.</p>
+
+            <h2 id="result">Result</h2>
+
+            <p>Download Steering Behaviors for your operating system of choice:</p>
+
+            <div id="download">
+                <p><strong>Windows:</strong> [ <a href="etc/v1.2.0/steering_v1.2.0_win32.zip">v1.2.0 (32-bit)</a> ] [ <a href="etc/v1.2.0/steering_v1.2.0_win64.zip">v1.2.0 (64-bit)</a> ]<br />
+                <strong>Mac:</strong> [ <a href="etc/v1.2.0/steering_v1.2.0_osx.zip">v1.2.0</a> ]<br />
+                <strong>Linux:</strong> [ <a href="etc/v1.2.0/steering_v1.2.0_linux32.zip">v1.2.0 (32-bit)</a> ] [ <a href="etc/v1.2.0/steering_v1.2.0_linux64.zip">v1.2.0 (64-bit)</a> ] [ <a href="etc/v1.2.0/steering_v1.2.0_linux-armv6hf.zip">v1.2.0 (ARMv6 hf)</a> ]</p>
+            </div>
+
+            <div class="center"><img src="img/steering_applet.png" title="Run, little boids, run!" alt="steering_applet" /></div>
+        </div>
+
+        <div id="footer">
+            <p>&copy; 2010 slsdo</p>
+        </div>
+    </div>
+</body>
+</html>
